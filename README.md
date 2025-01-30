@@ -6,7 +6,7 @@ Communicating with servo motor drive using EtherCAT protocol.
  > 3) Define the parameters you want manipulate or read</br> 
  > 4) Define Ethercat structs and variables related to master and slave</br> 
  > 5) Allocate memory for domain process data</br> 
- > 6) assign varaibles with suitable data type{usually unsigned int} for offsets 
+ > 6) Assign varaibles with suitable data type{usually unsigned int} for offsets 
    for PDO enteries</br> 
  > 7) create domain pdo enteries array for the parameters we are going to read 
    and write.</br> 
@@ -52,8 +52,36 @@ As our task is to rotate our servo motor to a target position so the parameter w
 #define ACTUAL_POSITION_INDEX 0x6064
 #define ACTUAL_VELOCITY_INDEX 0x606C
 #define OPERATION_MODE_INDEX 0x6060
+usually we need Index and Subindex so we define both but in our case the subindex is zero only so we didn't defined
+#define TARGET_POSITION {Index},{Subindex}
 ```
 ## Step 4: Define Ethercat structs and variables related to master and slave
+```
+static ec_master_t *master = NULL;
+static ec_master_state_t master_state = {};
+static ec_domain_t *domain1 = NULL;
+static ec_domain_state_t domain1_state = {};
+static ec_slave_config_t *slave_config = NULL;
+static ec_slave_config_state_t slave_config_state = {};
+
+```
+## Step 5: Allocate memory for domain process data
+```
+We alocate memory for pdo's domain
+uint8_t *domain1_pd = NULL;
+```
+## Step 6:  Assign varaibles with suitable data type{usually unsigned int} for offsets
+```
+The EtherCAT master must know these offsets to correctly read/write data.
+unsigned int off_control_word;
+unsigned int off_status_word;
+unsigned int off_target_position;
+unsigned int off_actual_position;
+unsigned int off_actual_velocity;
+unsigned int off_operation_mode;
+
+```
+
 
  
 
