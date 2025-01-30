@@ -20,8 +20,9 @@ Communicating with servo motor drive using EtherCAT protocol.
  > 12) defining cycle task fn the main fn where we will read and write from slave.</br>
  
  **We will now explore each order step wise and will look in the details**
- ## Step 1:Include all necessary libraries which you will be needed for your task  
- bash ''' #include <errno.h>
+ ## Step 1:Include all necessary libraries which you will be needed for your task 
+ ```
+#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
@@ -30,6 +31,8 @@ Communicating with servo motor drive using EtherCAT protocol.
 #include <unistd.h>
 #include <time.h>
 #include "ecrt.h"
-#include <iostream> '''
+#include <iostream> 
+```
+
  
 
