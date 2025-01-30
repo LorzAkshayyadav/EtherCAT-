@@ -177,74 +177,55 @@ void check_domain1_state(void)
 
     domain1_state = ds;
 }
-void move_to_position(int target_pos)
+void cyclic_task(int target_pos)
 {
-    // Set the drive to Position Control mode
-    EC_WRITE_S8(domain1_pd + off_operation_mode, 1); // 1 = Position Control mode
 
-    EC_WRITE_U16(domain1_pd + off_control_word, 0x0006); // Enable voltage
-    usleep(10000);
-    EC_WRITE_U16(domain1_pd + off_control_word, 0x0007); // Switch On
-    usleep(10000);
-    EC_WRITE_U16(domain1_pd + off_control_word, 0x000F); // Enable Operation
+    // Process EtherCAT master and domain
+    ecrt_master_receive(master);
+    ecrt_domain_process(domain1);
 
-    // Verify the slave is in the OPERATIONAL state
-    ec_slave_config_state_t slave_state;
-    ecrt_slave_config_state(slave_config, &slave_state);
+    // Check the domain state
+    check_domain1_state();
 
-    if (slave_state.operational != EC_AL_STATE_OP)
-    {
-        cerr << "Error: Slave is not in OPERATIONAL state." << endl;
-        return;
-    }
+    // Read status and actual values
+    uint16_t status = EC_READ_U16(domain1_pd + off_status_word);
+    int actual_pos = EC_READ_S32(domain1_pd + off_actual_position);
+    int actual_vel = EC_READ_S32(domain1_pd + off_actual_velocity);
 
-    // Set the target position
-    EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
+    // Log status
+    cout << "Status: 0x" << hex << status
+         << ", Position: " << dec << actual_pos
+         << ", Velocity: " << actual_vel << endl;
 
-    while (1)
-    {
-        // Process EtherCAT master and domain
-        ecrt_master_receive(master);
-        ecrt_domain_process(domain1);
+    // Fault handling
+    if (status & (1 << 3))
+    { // Fault detected
+        cerr << "Fault detected in the drive!" << endl;
 
-        // Check the domain state
-        check_domain1_state();
+        // Attempt to reset the fault
+        EC_WRITE_U16(domain1_pd + off_control_word, 0x0080); // Fault reset
+        usleep(100000);
 
-        // Read status and actual values
-        uint16_t status = EC_READ_U16(domain1_pd + off_status_word);
-        int actual_pos = EC_READ_S32(domain1_pd + off_actual_position);
-        int actual_vel = EC_READ_S32(domain1_pd + off_actual_velocity);
-
-        // Log status
-        cout << "Status: 0x" << hex << status
-             << ", Position: " << dec << actual_pos
-             << ", Velocity: " << actual_vel << endl;
-
-        // Fault handling
-        if (status & (1 << 3))
-        { // Fault detected
-            cerr << "Fault detected in the drive!" << endl;
-
-            // Attempt to reset the fault
-            EC_WRITE_U16(domain1_pd + off_control_word, 0x0080); // Fault reset
-            usleep(100000);                                      
-
-            // Check if the fault is cleared
-            if (EC_READ_U16(domain1_pd + off_status_word) & (1 << 3))
-            {
-                cerr << "Failed to clear fault. Exiting." << endl;
-                return;
-            }
-
-            // Re-enable the drive after fault reset
-            EC_WRITE_U16(domain1_pd + off_control_word, 0x0006); // Enable voltage
-            usleep(10000);
-            EC_WRITE_U16(domain1_pd + off_control_word, 0x0007); // Switch On
-            usleep(10000);
-            EC_WRITE_U16(domain1_pd + off_control_word, 0x000F); // Enable Operation
+        // Check if the fault is cleared
+        if (EC_READ_U16(domain1_pd + off_status_word) & (1 << 3))
+        {
+            cerr << "Failed to clear fault. Exiting." << endl;
+            return;
         }
 
-        if(!(status)&(1<<2)){
+        // Re-enable the drive after fault reset
+        EC_WRITE_U16(domain1_pd + off_control_word, 0x0006); // Enable voltage
+        usleep(10000);
+        EC_WRITE_U16(domain1_pd + off_control_word, 0x0007); // Switch On
+        usleep(10000);
+        EC_WRITE_U16(domain1_pd + off_control_word, 0x000F); // Enable Operation
+        usleep(10000);
+        EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
+        usleep(10000);
+    }
+
+    if (!(status & (1 << 2)))
+    {
         uint16_t control_word = 0x0000; // Initialize control word
 
         if ((status & 0x006F) == 0x0021)
@@ -262,33 +243,23 @@ void move_to_position(int target_pos)
 
         // Write control word
         EC_WRITE_U16(domain1_pd + off_control_word, control_word);
-        }
-
-        // Check if the drive is in the Enabled Operation state
-        if (!(control_word & (1 << 3)))
-        {
-            cerr << "Drive is not in Enabled Operation state." << endl;
-            break;
-        }
-
-        // Check if the target position is reached
-        if (status & (1 << 10))
-        { // Target Reached
-            cout << "Target position reached!" << endl;
-            break;
-        }
-
-        // Send EtherCAT process data
-        ecrt_domain_queue(domain1);
-        ecrt_master_send(master);
-
-        
+        usleep(10000);
+        EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
         usleep(10000);
     }
 
-   
-    EC_WRITE_U16(domain1_pd + off_control_word, 0x0006); // Disable Operation
-    cout << "Drive moved to target position and set to safe state." << endl;
+    // Check if the target position is reached
+    if (status & (1 << 10))
+    { // Target Reached
+        cout << "Target position reached!" << endl;
+        return;
+    }
+
+    // Send EtherCAT process data
+    ecrt_domain_queue(domain1);
+    ecrt_master_send(master);
+
+    usleep(10000);
 }
 
 int main()
@@ -299,24 +270,48 @@ int main()
         return 1;
     }
 
-    cout << "EtherCAT initialized successfully." << endl;
-    ec_master_state_t master_state;
-    ecrt_master_state(master, &master_state);
-    if (master_state.slaves_responding == 0)
-    {
-        cerr << "No slaves responding. Exiting." << endl;
-        ecrt_release_master(master);
-        return 1;
-    }
-
     cout << "EtherCAT initialized successfully with " << master_state.slaves_responding << " slave(s)." << endl;
 
     int target_pos;
     cout << "what position you want to set in slave device" << endl;
 
     cin >> target_pos;
+    // Set the drive to Position Control mode
+    EC_WRITE_S8(domain1_pd + off_operation_mode, 1); // 1 = Position Control mode
+    usleep(10000);
+    int current_mode = EC_READ_S8(domain1_pd + off_operation_mode);
+    if (current_mode != 1)
+    {
+        cerr << "Error: Drive did not switch to Position Control Mode!" << endl;
+        return 0;
+    }
 
-    move_to_position(target_pos);
+    EC_WRITE_U16(domain1_pd + off_control_word, 0x0006); // Enable voltage
+    usleep(10000);
+    EC_WRITE_U16(domain1_pd + off_control_word, 0x0007); // Switch On
+    usleep(10000);
+    EC_WRITE_U16(domain1_pd + off_control_word, 0x000F); // Enable Operation
+
+    // Verify the slave is in the OPERATIONAL state
+    ec_slave_config_state_t slave_state;
+    ecrt_slave_config_state(slave_config, &slave_state);
+
+    if (slave_state.operational != EC_AL_STATE_OP)
+    {
+        cerr << "Error: Slave is not in OPERATIONAL state." << endl;
+
+        return 0;
+    }
+    EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
+
+    while (1)
+    {
+        cyclic_task(target_pos);
+    }
+
+    EC_WRITE_U16(domain1_pd + off_control_word, 0x0006); // Disable Operation
+    cout << "Drive moved to target position and set to safe state." << endl;
+
     if (master)
         ecrt_release_master(master);
 
