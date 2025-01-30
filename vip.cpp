@@ -15,7 +15,7 @@ using namespace std;
 #define PRODUCT_CODE 0x5EE1
 
 // Define constants for the single slave
-#define SLAVE_POSITION 1
+#define SLAVE_POSITION 0
 #define TARGET_POSITION_INDEX 0x607A
 #define CONTROL_WORD_INDEX 0x6040
 #define STATUS_WORD_INDEX 0x6041
@@ -177,7 +177,7 @@ void check_domain1_state(void)
 
     domain1_state = ds;
 }
-void cyclic_task(int target_pos)
+void cyclic_task(int target_pos,bool &temp)
 {
 
     // Process EtherCAT master and domain
@@ -201,65 +201,45 @@ void cyclic_task(int target_pos)
     if (status & (1 << 3))
     { // Fault detected
         cerr << "Fault detected in the drive!" << endl;
-
-        // Attempt to reset the fault
         EC_WRITE_U16(domain1_pd + off_control_word, 0x0080); // Fault reset
-        usleep(100000);
-
-        // Check if the fault is cleared
-        if (EC_READ_U16(domain1_pd + off_status_word) & (1 << 3))
-        {
-            cerr << "Failed to clear fault. Exiting." << endl;
-            return;
-        }
-
-        // Re-enable the drive after fault reset
-        EC_WRITE_U16(domain1_pd + off_control_word, 0x0006); // Enable voltage
-        usleep(10000);
-        EC_WRITE_U16(domain1_pd + off_control_word, 0x0007); // Switch On
-        usleep(10000);
-        EC_WRITE_U16(domain1_pd + off_control_word, 0x000F); // Enable Operation
-        usleep(10000);
-        EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
-        usleep(10000);
     }
 
-    if (!(status & (1 << 2)))
+    else if (!(status & (1 << 2)))
     {
-        uint16_t control_word = 0x0000; // Initialize control word
+        uint16_t control_word = 0x0000;
 
         if ((status & 0x006F) == 0x0021)
-        {                             // Ready to Switch On
+        {
             control_word |= (1 << 1); // Enable Voltage
         }
         else if ((status & 0x006F) == 0x0023)
-        {                                        // Switched On
+        {
             control_word |= (1 << 1) | (1 << 0); // Switch On + Enable Voltage
         }
         else if ((status & 0x006F) == 0x0027)
-        {                                                   // Ready for Operation
+        {
             control_word |= (1 << 1) | (1 << 0) | (1 << 3); // Enable Operation
         }
 
-        // Write control word
+       
         EC_WRITE_U16(domain1_pd + off_control_word, control_word);
-        usleep(10000);
+        EC_WRITE_S8(domain1_pd + off_operation_mode, 8); // 8 = Cyclic Synchronous Position mode
         EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
-        usleep(10000);
     }
 
-    // Check if the target position is reached
     if (status & (1 << 10))
-    { // Target Reached
+    { 
         cout << "Target position reached!" << endl;
+        temp=true;
+
         return;
     }
 
     // Send EtherCAT process data
     ecrt_domain_queue(domain1);
     ecrt_master_send(master);
-
     usleep(10000);
+
 }
 
 int main()
@@ -276,23 +256,7 @@ int main()
     cout << "what position you want to set in slave device" << endl;
 
     cin >> target_pos;
-    // Set the drive to Position Control mode
-    EC_WRITE_S8(domain1_pd + off_operation_mode, 1); // 1 = Position Control mode
-    usleep(10000);
-    int current_mode = EC_READ_S8(domain1_pd + off_operation_mode);
-    if (current_mode != 1)
-    {
-        cerr << "Error: Drive did not switch to Position Control Mode!" << endl;
-        return 0;
-    }
 
-    EC_WRITE_U16(domain1_pd + off_control_word, 0x0006); // Enable voltage
-    usleep(10000);
-    EC_WRITE_U16(domain1_pd + off_control_word, 0x0007); // Switch On
-    usleep(10000);
-    EC_WRITE_U16(domain1_pd + off_control_word, 0x000F); // Enable Operation
-
-    // Verify the slave is in the OPERATIONAL state
     ec_slave_config_state_t slave_state;
     ecrt_slave_config_state(slave_config, &slave_state);
 
@@ -302,11 +266,12 @@ int main()
 
         return 0;
     }
-    EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
-
-    while (1)
+    bool temp=false;
+    while (!temp)
     {
-        cyclic_task(target_pos);
+       
+        cyclic_task(target_pos,temp);
+        
     }
 
     EC_WRITE_U16(domain1_pd + off_control_word, 0x0006); // Disable Operation
