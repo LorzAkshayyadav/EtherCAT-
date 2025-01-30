@@ -17,6 +17,8 @@ Communicating with servo motor drive using EtherCAT protocol.
  > 10) sync manager configuration , define an array {slave_syncs} which contains 
    which slave pdo act as output and which one as input</br> 
  > 11) initialize ethercat {check for all possible errors }</br> 
- > 12) defining cycle task fn the main fn where we will read and write from slave.</br> 
-   
+ > 12) defining cycle task fn the main fn where we will read and write from slave.</br>
+ 
+ <!-- **We will now explore each order step wise and will look in the details** -->
+ 
 
