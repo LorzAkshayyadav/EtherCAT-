@@ -21,7 +21,7 @@ Communicating with servo motor drive using EtherCAT protocol.
  
  **We will now explore each order step wise and will look in the details**
  ## Step 1:Include all necessary libraries which you will be needed for your task  
- "' #include <errno.h>
+ bash ''' #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
@@ -30,6 +30,6 @@ Communicating with servo motor drive using EtherCAT protocol.
 #include <unistd.h>
 #include <time.h>
 #include "ecrt.h"
-#include <iostream>   "'
+#include <iostream> '''
  
 
