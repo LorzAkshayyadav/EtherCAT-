@@ -20,7 +20,7 @@ Communicating with servo motor drive using EtherCAT protocol.
  > 12) defining cycle task fn the main fn where we will read and write from slave.</br>
  
  **We will now explore each order step wise and will look in the details**
- ## Step 1:Include all necessary libraries which you will be needed for your task 
+## Step 1:Include all necessary libraries which you will be needed for your task 
  ```
 #include <errno.h>
 #include <signal.h>
@@ -33,6 +33,27 @@ Communicating with servo motor drive using EtherCAT protocol.
 #include "ecrt.h"
 #include <iostream> 
 ```
+## Step 2: Define your drive
+```
+#define VENDOR_ID 0x0000029C
+#define PRODUCT_CODE 0x5EE1
+there are two way to define your drive you can do that way too but in case of multiple slaves better go with this way
+#define {Driver Name} {Vendor_Id}, {Product_Code}
+#define Beckhoff_EL2004 0x00000002, 0x07d43052
+
+```
+## Step 3: Define the parameters you want manipulate or read
+```
+As our task is to rotate our servo motor to a target position so the parameter we need to access are these :
+#define SLAVE_POSITION 1
+#define TARGET_POSITION_INDEX 0x607A
+#define CONTROL_WORD_INDEX 0x6040
+#define STATUS_WORD_INDEX 0x6041
+#define ACTUAL_POSITION_INDEX 0x6064
+#define ACTUAL_VELOCITY_INDEX 0x606C
+#define OPERATION_MODE_INDEX 0x6060
+```
+## Step 4: Define Ethercat structs and variables related to master and slave
 
  
 
