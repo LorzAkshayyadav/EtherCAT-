@@ -208,7 +208,7 @@ void cyclic_task(int target_pos, bool &temp)
         return;
     }
 
-    if (((status | 65424) ^ 65463) != 0)
+    if ((status & 0x006F) != 0x0027)
     {
         uint16_t control_word = 0x0000;
 
