@@ -116,7 +116,10 @@ const ec_pdo_info_t slave_pdos[] = {
     {0x1600, 3, slave_pdo_entries + 0}, // RxPDO
     {0x1A00, 3, slave_pdo_entries + 3}, // TxPDO
 };
-/* for example in our case we are regestring control word to Mode of operation as RxPDO , Control word is at 0th index of slave pdo enteries array so this will act as base address , in TxPDO Status word to Actual velocity , our status word is at 3rd index so base address will be slave_pdo_enteries + 3 */
+// for example in our case we are regestring control word to Mode of operation as RxPDO ,
+ Control word is at 0th index of slave pdo enteries array so this will act as base address ,
+ in TxPDO Status word to Actual velocity , our status word is at 3rd index so base address will
+ be slave_pdo_enteries + 3 //
 
 ```
 ## Step 10: Sync manager configuration , define an array {slave_syncs} which contains which slave pdo act as output and which one as input
