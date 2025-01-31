@@ -81,7 +81,34 @@ unsigned int off_actual_velocity;
 unsigned int off_operation_mode;
 
 ```
+## Step 7: create domain pdo enteries array for the parameters we are going to read and write
+```
+# Keep one thing in mind always put recieve parameters together and transmit parameter together 
+const ec_pdo_entry_reg_t domain1_pdo_entries[] = {
+   //{Slave_alias _address,Slave position, vendor id, product code, PDO Entry Index , PDO Entry Subindex ,*offset } 
+    {0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE, CONTROL_WORD_INDEX, 0x00, &off_control_word},
+    {0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE, TARGET_POSITION_INDEX, 0x00, &off_target_position},
+    {0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE, OPERATION_MODE_INDEX, 0x00, &off_operation_mode},
+    {0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE, STATUS_WORD_INDEX, 0x00, &off_status_word},
+    {0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE, ACTUAL_POSITION_INDEX, 0x00, &off_actual_position},
+    {0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE, ACTUAL_VELOCITY_INDEX, 0x00, &off_actual_velocity},
 
+    {}};
+```
+## Step 8: define slave pdo entries array which contains bitsize info of our parameter along index and subindex
+```
+const ec_pdo_entry_info_t slave_pdo_entries[] = {
+   //{parameter_index,parameter_subindex,bit_length}
+    {CONTROL_WORD_INDEX, 0x00, 16},    // Control Word
+    {TARGET_POSITION_INDEX, 0x00, 32}, // Target Position
+    {OPERATION_MODE_INDEX, 0x00, 8},   // Mode of Operation
+    {STATUS_WORD_INDEX, 0x00, 16},     // Status Word
+    {ACTUAL_POSITION_INDEX, 0x00, 32}, // Actual Position
+    {ACTUAL_VELOCITY_INDEX, 0x00, 32}, // Actual Velocity
+};
+# top 3 parameters we are going to use to write so together and last three parameter we are going to use to read
+```
+## Step 9: 
 
  
 
