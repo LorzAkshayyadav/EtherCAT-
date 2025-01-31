@@ -199,9 +199,20 @@ void cyclic_task(int target_pos, bool &temp)
 
     // Fault handling
     if (status & (1 << 3))
-    { // Fault detected
+    {
         cerr << "Fault detected in the drive!" << endl;
-        EC_WRITE_U16(domain1_pd + off_control_word, 0x0080); // Fault reset
+        EC_WRITE_U16(domain1_pd + off_control_word, 0x0080);
+        ecrt_domain_queue(domain1);
+        ecrt_master_send(master);
+        usleep(10000);
+        return;
+    }
+
+    //  "Switch On Disabled"
+    if ((status & 0x006F) == 0x0040)
+    {
+        cerr << "Drive in 'Switch On Disabled' state, resetting fault..." << endl;
+        EC_WRITE_U16(domain1_pd + off_control_word, 0x0080); // Fault Reset
         ecrt_domain_queue(domain1);
         ecrt_master_send(master);
         usleep(10000);
@@ -214,29 +225,26 @@ void cyclic_task(int target_pos, bool &temp)
 
         if ((status & 0x006F) == 0x0021)
         {
-            control_word |= (1 << 1)|(2 << 1); // Enable Voltage
+            control_word |= (1 << 1) | (1 << 2); // Enable Voltage
         }
         else if ((status & 0x006F) == 0x0023)
         {
-            control_word |= (1 << 1) | (1 << 0) | |(2 << 1); // Switch On + Enable Voltage
+            control_word |= (1 << 1) | (1 << 0) | (1 << 2); // Switch On + Enable Voltage
         }
         else if ((status & 0x006F) == 0x0027)
         {
-            control_word |= (1 << 1) | (1 << 0) | (1 << 3) | |(2 << 1); // Enable Operation
+            control_word |= (1 << 1) | (1 << 0) | (1 << 3) | (1 << 2); // Enable Operation
         }
 
         EC_WRITE_U16(domain1_pd + off_control_word, control_word);
-
         ecrt_domain_queue(domain1);
         ecrt_master_send(master);
         usleep(10000);
         return;
     }
-    else
-    {
-        EC_WRITE_S8(domain1_pd + off_operation_mode, 8); // 8 = Cyclic Synchronous Position mode
-        EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
-    }
+
+    EC_WRITE_S8(domain1_pd + off_operation_mode, 8); // 8 = Cyclic Synchronous Position mode
+    EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
 
     if (status & (1 << 10))
     {
