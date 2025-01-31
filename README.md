@@ -8,15 +8,15 @@ Communicating with servo motor drive using EtherCAT protocol.
  > 5) Allocate memory for domain process data</br> 
  > 6) Assign varaibles with suitable data type{usually unsigned int} for offsets 
    for PDO enteries</br> 
- > 7) create domain pdo enteries array for the parameters we are going to read 
+ > 7) Create domain pdo enteries array for the parameters we are going to read 
    and write.</br> 
- > 8) define slave pdo entries array which contains bitsize info of our parameter 
+ > 8) Define slave pdo entries array which contains bitsize info of our parameter 
    along index and subindex</br> 
- > 9) now do pdo mapping , define an slave_pdos arrays where you devide our 
+ > 9) Now do pdo mapping , define an slave_pdos arrays where you devide our 
    parameters according to their transmission type {RxPDO or TxPDO)</br> 
- > 10) sync manager configuration , define an array {slave_syncs} which contains 
+ > 10) Sync manager configuration , define an array {slave_syncs} which contains 
    which slave pdo act as output and which one as input</br> 
- > 11) initialize ethercat {check for all possible errors }</br> 
+ > 11) Initialize ethercat {check for all possible errors }</br> 
  > 12) defining cycle task fn the main fn where we will read and write from slave.</br>
  
  **We will now explore each order step wise and will look in the details**
@@ -81,7 +81,7 @@ unsigned int off_actual_velocity;
 unsigned int off_operation_mode;
 
 ```
-## Step 7: create domain pdo enteries array for the parameters we are going to read and write
+## Step 7: Create domain pdo enteries array for the parameters we are going to read and write
 ```
 # Keep one thing in mind always put recieve parameters together and transmit parameter together 
 const ec_pdo_entry_reg_t domain1_pdo_entries[] = {
@@ -95,7 +95,7 @@ const ec_pdo_entry_reg_t domain1_pdo_entries[] = {
 
     {}};
 ```
-## Step 8: define slave pdo entries array which contains bitsize info of our parameter along index and subindex
+## Step 8: Define slave pdo entries array which contains bitsize info of our parameter along index and subindex
 ```
 const ec_pdo_entry_info_t slave_pdo_entries[] = {
    //{parameter_index,parameter_subindex,bit_length}
@@ -108,7 +108,130 @@ const ec_pdo_entry_info_t slave_pdo_entries[] = {
 };
 # top 3 parameters we are going to use to write so together and last three parameter we are going to use to read
 ```
-## Step 9: 
+## Step 9: Now do pdo mapping , define an slave_pdos arrays where you devide our  parameters according to their transmission type {RxPDO or TxPDO)
+```
+// first 3 parameter as mapped as RxPDO to write to slave on master command and last 3 parameter assigned as TxPDO to read
+const ec_pdo_info_t slave_pdos[] = {
+   // {PDO Index ,no_of pdo enteries , adrress to base of array enteries }
+    {0x1600, 3, slave_pdo_entries + 0}, // RxPDO
+    {0x1A00, 3, slave_pdo_entries + 3}, // TxPDO
+};
+/* for example in our case we are regestring control word to Mode of operation as RxPDO , Control word is at 0th index of slave pdo enteries array so this will act as base address , in TxPDO Status word to Actual velocity , our status word is at 3rd index so base address will be slave_pdo_enteries + 3 */
+
+```
+## Step 10: Sync manager configuration , define an array {slave_syncs} which contains which slave pdo act as output and which one as input
+```
+const ec_sync_info_t slave_syncs[] = {
+   //{ sync manager index , Data direction , no of pdo assigned , pointer to pdo config , watchdog setting}
+    {0, EC_DIR_OUTPUT, 0, NULL, EC_WD_DISABLE},
+    {1, EC_DIR_INPUT, 0, NULL, EC_WD_DISABLE},
+    {2, EC_DIR_OUTPUT, 1, slave_pdos + 0, EC_WD_ENABLE},
+    {3, EC_DIR_INPUT, 1, slave_pdos + 1, EC_WD_DISABLE},
+    {0xff}};
+/*
+ Sync Manager 0 & 1
+These are typically used for mailbox communication (CoE, FoE, etc.).
+They are not assigned any PDOs.
+Watchdog is disabled.
+
+Sync Manager 2 & 3
+These are for Process Data (PDO) communication.
+SM2 is output (master → slave), and SM3 is input (slave → master).
+slave_pdos + 0 and slave_pdos + 1 point to structures that define the PDOs.
+
+0xFF Terminator
+This marks the end of the array so that iterating code can detect it.
+   */
+same explaination of base address goes here
+```
+## Step 11: initialize ethercat {check for all possible errors }
+```
+int initialize_ethercat()
+{
+    // Request master
+    master = ecrt_request_master(0);
+    if (!master)
+    {
+        cerr << "Failed to request master." << endl;
+        return -1;
+    }
+    cout << "EtherCAT master requested successfully." << endl;
+    // Check master state
+    ec_master_state_t master_state;
+    ecrt_master_state(master, &master_state);
+    if (master_state.slaves_responding == 0)
+    {
+        cerr << "No slaves responding" << endl;
+        return -1;
+    }
+    // Create domain
+    domain1 = ecrt_master_create_domain(master);
+    if (!domain1)
+    {
+        cerr << "Failed to create domain." << endl;
+        return -1;
+    }
+    cout << "Domain created successfully." << endl;
+
+    // Get slave configuration
+    if (!(slave_config = ecrt_master_slave_config(master, 0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE)))
+    {
+        cerr << "Failed to get slave configuration." << endl;
+        return -1;
+    }
+    cout << "Slave configuration successful." << endl;
+
+    // Configure PDOs
+    if (ecrt_slave_config_pdos(slave_config, EC_END, slave_syncs))
+    {
+        cerr << "Failed to configure PDOs." << endl;
+        return -1;
+    }
+    cout << "PDO configuration successful." << endl;
+
+    // Register PDO entries
+    if (ecrt_domain_reg_pdo_entry_list(domain1, domain1_pdo_entries))
+    {
+        cerr << "PDO entry registration failed!" << endl;
+        return -1;
+    }
+    cout << "PDO entries registered successfully." << endl;
+
+    // Activate master
+    if (ecrt_master_activate(master))
+    {
+        cerr << "Failed to activate master." << endl;
+        return -1;
+    }
+    cout << "Master activated successfully." << endl;
+
+    // Check if the domain is valid before accessing data
+    if (domain1 == NULL)
+    {
+        cerr << "Domain is not initialized properly." << endl;
+        return -1;
+    }
+    else
+    {
+        cout << "Domain is valid, attempting to retrieve data." << endl;
+    }
+
+    // Get domain data
+    domain1_pd = ecrt_domain_data(domain1);
+    if (!domain1_pd)
+    {
+        cerr << "Failed to get domain data." << endl;
+        return -1;
+    }
+    cout << "Domain data retrieved successfully." << endl;
+
+    return 0;
+}
+
+
+```
+## Step 12: defining cycle task fn the main fn where we will read and write from slave.
+
 
  
 
