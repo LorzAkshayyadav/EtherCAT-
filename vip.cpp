@@ -214,15 +214,15 @@ void cyclic_task(int target_pos, bool &temp)
 
         if ((status & 0x006F) == 0x0021)
         {
-            control_word |= (1 << 1); // Enable Voltage
+            control_word |= (1 << 1)|(2 << 1); // Enable Voltage
         }
         else if ((status & 0x006F) == 0x0023)
         {
-            control_word |= (1 << 1) | (1 << 0); // Switch On + Enable Voltage
+            control_word |= (1 << 1) | (1 << 0) | |(2 << 1); // Switch On + Enable Voltage
         }
         else if ((status & 0x006F) == 0x0027)
         {
-            control_word |= (1 << 1) | (1 << 0) | (1 << 3); // Enable Operation
+            control_word |= (1 << 1) | (1 << 0) | (1 << 3) | |(2 << 1); // Enable Operation
         }
 
         EC_WRITE_U16(domain1_pd + off_control_word, control_word);
