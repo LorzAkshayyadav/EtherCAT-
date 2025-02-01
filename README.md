@@ -234,7 +234,7 @@ int initialize_ethercat()
 
 ```
 ## Step 12: defining cycle task fn the main fn where we will read and write from slave.
-![Status_word_table](Screenshot 2025-01-31 180659.png)
+![Status_word_table]([Screenshot 2025-01-31 180659.png](https://github.com/LorzAkshayyadav/Running-Servo-Motor-Drive-Using-EtherCAT-/blob/58a2d0e2492bf244473ebb1b18719e746fb60563/Screenshot%202025-01-31%20180659.png))
 ```
 void cyclic_task(int target_pos, bool &temp)
 {
