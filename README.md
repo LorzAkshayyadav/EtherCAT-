@@ -234,6 +234,94 @@ int initialize_ethercat()
 
 ```
 ## Step 12: defining cycle task fn the main fn where we will read and write from slave.
+![Alt Text](relative/path/to/image.png)
+```
+void cyclic_task(int target_pos, bool &temp)
+{
+
+
+    // Process EtherCAT master and domain
+    ecrt_master_receive(master);
+    ecrt_domain_process(domain1);
+
+    // Check the domain state
+    check_domain1_state();
+
+    // Read status and actual values
+    uint16_t status = EC_READ_U16(domain1_pd + off_status_word);
+    int actual_pos = EC_READ_S32(domain1_pd + off_actual_position);
+    int actual_vel = EC_READ_S32(domain1_pd + off_actual_velocity);
+
+    // Log status
+    cout << "Status: 0x" << hex << status
+         << ", Position: " << dec << actual_pos
+         << ", Velocity: " << actual_vel << endl;
+
+    // Fault handling
+    if (status & (1 << 3))
+    {
+        cerr << "Fault detected in the drive!" << endl;
+        EC_WRITE_U16(domain1_pd + off_control_word, 0x0080);
+        ecrt_domain_queue(domain1);
+        ecrt_master_send(master);
+        usleep(10000);
+        return;
+    }
+
+    //  "Switch On Disabled"
+    if ((status & 0x006F) == 0x0040)
+    {
+        cerr << "Drive in 'Switch On Disabled' state, resetting fault..." << endl;
+        EC_WRITE_U16(domain1_pd + off_control_word, 0x0080); // Fault Reset
+        ecrt_domain_queue(domain1);
+        ecrt_master_send(master);
+        usleep(10000);
+        return;
+    }
+
+    if ((status & 0x006F) != 0x0027)
+    {
+        uint16_t control_word = 0x0000;
+
+        if ((status & 0x006F) == 0x0021)
+        {
+            control_word |= (1 << 1) | (1 << 2); // Enable Voltage
+        }
+        else if ((status & 0x006F) == 0x0023)
+        {
+            control_word |= (1 << 1) | (1 << 0) | (1 << 2); // Switch On + Enable Voltage
+        }
+        else if ((status & 0x006F) == 0x0027)
+        {
+            control_word |= (1 << 1) | (1 << 0) | (1 << 3) | (1 << 2); // Enable Operation
+        }
+
+        EC_WRITE_U16(domain1_pd + off_control_word, control_word);
+        ecrt_domain_queue(domain1);
+        ecrt_master_send(master);
+        usleep(10000);
+        return;
+    }
+
+    EC_WRITE_S8(domain1_pd + off_operation_mode, 8); // 8 = Cyclic Synchronous Position mode
+    EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
+
+    if (status & (1 << 10))
+    {
+        cout << "Target position reached!" << endl;
+        temp = true;
+
+        return;
+    }
+
+    // Send EtherCAT process data
+    ecrt_domain_queue(domain1);
+    ecrt_master_send(master);
+    usleep(10000);
+    return;
+}
+```
+
 
 
  
