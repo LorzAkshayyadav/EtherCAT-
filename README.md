@@ -236,6 +236,7 @@ int initialize_ethercat()
 ## Step 12: defining cycle task fn the main fn where we will read and write from slave.
 ![Status_word_table]([Screenshot 2025-01-31 180659.png](https://github.com/LorzAkshayyadav/Running-Servo-Motor-Drive-Using-EtherCAT-/blob/58a2d0e2492bf244473ebb1b18719e746fb60563/Screenshot%202025-01-31%20180659.png))
 ```
+We have to verify that drive is in motion state or not for that we will check lower 7 bit of Status Word and check if they are like that or X11 0111 ,and will check if there is falult and according using control word we will write to drive enable the operation 
 void cyclic_task(int target_pos, bool &temp)
 {
 
@@ -278,7 +279,7 @@ void cyclic_task(int target_pos, bool &temp)
         usleep(10000);
         return;
     }
-
+// Here we are checking that drive is in enable operation mode or not if not we will first put it in enable operation mode after that only we will write our target position
     if ((status & 0x006F) != 0x0027)
     {
         uint16_t control_word = 0x0000;
@@ -306,7 +307,7 @@ void cyclic_task(int target_pos, bool &temp)
     EC_WRITE_S8(domain1_pd + off_operation_mode, 8); // 8 = Cyclic Synchronous Position mode
     EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
 
-    if (status & (1 << 10))
+    if (status & (1 << 10)) //if 10th bit got set that means our set target has been reached and we can return 
     {
         cout << "Target position reached!" << endl;
         temp = true;
