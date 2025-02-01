@@ -234,7 +234,7 @@ int initialize_ethercat()
 
 ```
 ## Step 12: defining cycle task fn the main fn where we will read and write from slave.
-![Alt Text](relative/path/to/image.png)
+![Status_word_table](Screenshot 2025-01-31 180659.png)
 ```
 void cyclic_task(int target_pos, bool &temp)
 {
