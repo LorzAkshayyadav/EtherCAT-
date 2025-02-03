@@ -243,7 +243,7 @@ void cyclic_task(int target_pos, bool &temp)
         return;
     }
 
-    EC_WRITE_S8(domain1_pd + off_operation_mode, 8); // 8 = Cyclic Synchronous Position mode
+    EC_WRITE_S8(domain1_pd + off_operation_mode, 1); // 1 = profile Position mode , 8=cyclic synchronous position mode
     EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
 
     if (status & (1 << 10))
