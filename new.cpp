@@ -210,28 +210,28 @@ int main()
     ecrt_slave_config_sdo8(sc, 0x1600, 0, 0);
     /* Define RxPdo */
 
-    ecrt_slave_config_sdo32(sc, 0x1600, 1, 0x60400010); /* 0x6040:0/16bits, control word */
-    ecrt_slave_config_sdo32(sc, 0x1600, 2, 0x607a0020); /* 0x607a:0/32bits, Position set Point */
-    ecrt_slave_config_sdo32(sc, 0x1600, 3, 0x60600008); /* 0x6060:0/8bits, mode_of_operation */
-    ecrt_slave_config_sdo8(sc, 0x1600, 0, 3);           /* set number of PDO entries for 0x1600 */
+    ecrt_slave_config_sdo32(sc, 0x1600, 1, 0x60400010); 
+    ecrt_slave_config_sdo32(sc, 0x1600, 2, 0x607a0020); 
+    ecrt_slave_config_sdo32(sc, 0x1600, 3, 0x60600008); 
+    ecrt_slave_config_sdo8(sc, 0x1600, 0, 3);          
 
-    ecrt_slave_config_sdo16(sc, 0x1C12, 1, 0x1600); /* list all RxPdo in 0x1C00:1-2*/
+    ecrt_slave_config_sdo16(sc, 0x1C12, 1, 0x1600); 
 
-    ecrt_slave_config_sdo8(sc, 0x1C12, 0, 1); /* set number of RxPDO */
+    ecrt_slave_config_sdo8(sc, 0x1C12, 0, 1); 
 
     ecrt_slave_config_pdo_mapping_clear(sc, 0x1600);
 
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1600, 0x6040, 0, 16); /* 0x6040:0/16bits, control word */
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1600, 0x607a, 0, 32); /* 0x607a:0/32bits, Position set Point */
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1600, 0x6060, 0, 8);  /* 0x6060:0/8bits, mode_of_operation */
+    ecrt_slave_config_pdo_mapping_add(sc, 0x1600, 0x6040, 0, 16);
+    ecrt_slave_config_pdo_mapping_add(sc, 0x1600, 0x607a, 0, 32); 
+    ecrt_slave_config_pdo_mapping_add(sc, 0x1600, 0x6060, 0, 8);  /
 
     /* Define TxPdo */
 
     ecrt_slave_config_pdo_mapping_clear(sc, 0x1A00);
 
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1A00, 0x6041, 0, 16); /* 0x6041:0/16bits, Statusword */
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1A00, 0x6064, 0, 32); /* 0x6064:0/32bits, Actual Position */
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1A00, 0x606C, 0, 32); /* 0x606C:0/32bits, Actual Velocity */
+    ecrt_slave_config_pdo_mapping_add(sc, 0x1A00, 0x6041, 0, 16); 
+    ecrt_slave_config_pdo_mapping_add(sc, 0x1A00, 0x6064, 0, 32); 
+    ecrt_slave_config_pdo_mapping_add(sc, 0x1A00, 0x606C, 0, 32); 
     if (ecrt_slave_config_pdos(sc, EC_END, slave_syncs))
     {
         cerr << "Failed to configure PDOs." << endl;
