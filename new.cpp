@@ -74,12 +74,6 @@ const ec_sync_info_t slave_syncs[] = {
     {3, EC_DIR_INPUT, 1, slave_pdos + 1, EC_WD_DISABLE},
     {0xff}};
 
-// Initialize EtherCAT
-int initialize_ethercat()
-{
-
-    return 0;
-}
 void check_domain1_state(void)
 {
     ec_domain_state_t ds;
@@ -136,30 +130,26 @@ void cyclic_task(int target_pos, bool &temp)
         usleep(10000);
         return;
     }
-
-    if ((status & 0x006F) != 0x0027)
+    while ((status & 0x006F) != 0x0027)
     {
         uint16_t control_word = 0x0000;
-
+    
         if ((status & 0x006F) == 0x0021)
-        {
             control_word |= (1 << 1) | (1 << 2); // Enable Voltage
-        }
         else if ((status & 0x006F) == 0x0023)
-        {
             control_word |= (1 << 1) | (1 << 0) | (1 << 2); // Switch On + Enable Voltage
-        }
         else if ((status & 0x006F) == 0x0027)
-        {
             control_word |= (1 << 1) | (1 << 0) | (1 << 3) | (1 << 2); // Enable Operation
-        }
-
+    
         EC_WRITE_U16(domain1_pd + off_control_word, control_word);
         ecrt_domain_queue(domain1);
         ecrt_master_send(master);
         usleep(10000);
-        return;
+    
+        // Read updated status
+        status = EC_READ_U16(domain1_pd + off_status_word);
     }
+    
 
     EC_WRITE_S8(domain1_pd + off_operation_mode, 8); // 8 = Cyclic Synchronous Position mode , 1= profile position mode
     EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
@@ -293,7 +283,7 @@ int main()
     cin >> target_pos;
 
     ec_slave_config_state_t slave_state;
-    ecrt_slave_config_state(slave_config, &slave_state);
+    ecrt_slave_config_state(sc, &slave_state);
 
     if (slave_state.operational != EC_AL_STATE_OP)
     {
