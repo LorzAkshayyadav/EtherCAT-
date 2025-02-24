@@ -11,8 +11,8 @@
 
 using namespace std;
 
-#define VENDOR_ID 0x0000029C
-#define PRODUCT_CODE 0x5EE1
+#define VENDOR_ID 0x000022d2
+#define PRODUCT_CODE 0x00000301
 
 // Define constants for the single slave
 #define SLAVE_POSITION 0
@@ -307,9 +307,6 @@ int main()
 
         cyclic_task(target_pos, temp);
     }
-
-    EC_WRITE_U16(domain1_pd + off_control_word, 0x0006); // Disable Operation
-    cout << "Drive moved to target position and set to safe state." << endl;
 
     if (master)
         ecrt_release_master(master);
