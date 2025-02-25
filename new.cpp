@@ -91,38 +91,29 @@ void check_domain1_state(void)
 
     domain1_state = ds;
 }
-uint16_t update_status(uint16_t status, uint16_t cmd)
-{
+uint16_t update_status(uint16_t status, uint16_t cmd) {
     // Fault handling
-    if (status & (1 << 3))
-    {
-        cmd = 128;
-        return cmd;
+    if (status & (1 << 3)) {
+        return 128;
     }
-    if ((status & 0x006F) && (1 << 6))
-    {
-        cmd = 128;
-        return cmd;
+    
+    if ((status & 0x006F) && (status & (1 << 6))) {
+        return 128;
     }
-    else if (((status | 65456) ^ 65520) == 0 && cmd != 6)
-    {
 
+    if (((status | 65456) ^ 65520) == 0 && cmd != 6) {
         cmd = 6;
-    }
-    else if (((status | 65424) ^ 65457) == 0 && cmd != 7)
-    {
-
+    } 
+    else if (((status | 65424) ^ 65457) == 0 && cmd != 7) {
         cmd = 7;
-    }
-    else if (((status | 65424) ^ 65459) == 0 && command != 15)
-    {
+    } 
+    else if (((status | 65424) ^ 65459) == 0 && cmd != 15) {
         cmd = 15;
+    } 
+    else if (((status | 65424) ^ 65463) == 0) {
+        std::cout << "Operation Enabled \n";
     }
-    else if (((status | 65424) ^ 65463) == 0)
-    {
 
-        cout << "Operation Enabled \n";
-    }
     return cmd;
 }
 void cyclic_task(int target_pos, bool &temp)
