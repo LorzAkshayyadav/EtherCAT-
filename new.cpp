@@ -98,17 +98,17 @@ uint16_t update_status(uint16_t status, uint16_t cmd) {
     }
     
     if ((status & 0x006F) && (status & (1 << 6))) {
-        return 128;
+        return 128; //->it will do fault reset
     }
 
     if (((status | 65456) ^ 65520) == 0 && cmd != 6) {
-        cmd = 6;
+        cmd = 6; //->it will take drive to ready to switch on{110}
     } 
     else if (((status | 65424) ^ 65457) == 0 && cmd != 7) {
-        cmd = 7;
+        cmd = 7; //->it will switched on the drive {111}
     } 
     else if (((status | 65424) ^ 65459) == 0 && cmd != 15) {
-        cmd = 15;
+        cmd = 15;// ->it will enable the operation {1111}
     } 
     else if (((status | 65424) ^ 65463) == 0) {
         std::cout << "Operation Enabled \n";
