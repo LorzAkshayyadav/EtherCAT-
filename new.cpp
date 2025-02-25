@@ -91,6 +91,40 @@ void check_domain1_state(void)
 
     domain1_state = ds;
 }
+uint16_t update_status(uint16_t status, uint16_t cmd)
+{
+    // Fault handling
+    if (status & (1 << 3))
+    {
+        cmd = 128;
+        return cmd;
+    }
+    if ((status & 0x006F) && (1 << 6))
+    {
+        cmd = 128;
+        return cmd;
+    }
+    else if (((status | 65456) ^ 65520) == 0 && cmd != 6)
+    {
+
+        cmd = 6;
+    }
+    else if (((status | 65424) ^ 65457) == 0 && cmd != 7)
+    {
+
+        cmd = 7;
+    }
+    else if (((status | 65424) ^ 65459) == 0 && command != 15)
+    {
+        cmd = 15;
+    }
+    else if (((status | 65424) ^ 65463) == 0)
+    {
+
+        cout << "Operation Enabled \n";
+    }
+    return cmd;
+}
 void cyclic_task(int target_pos, bool &temp)
 {
 
@@ -100,7 +134,7 @@ void cyclic_task(int target_pos, bool &temp)
 
     // Check the domain state
     check_domain1_state();
-
+    int cmd = 0;
     uint16_t status = EC_READ_U16(domain1_pd + off_status_word);
     int actual_pos = EC_READ_S32(domain1_pd + off_actual_position);
     int actual_vel = EC_READ_S32(domain1_pd + off_actual_velocity);
@@ -109,50 +143,14 @@ void cyclic_task(int target_pos, bool &temp)
          << ", Position: " << dec << actual_pos
          << ", Velocity: " << actual_vel << endl;
 
-    // Fault handling
-    if (status & (1 << 3))
-    {
-        cerr << "Fault detected in the drive!" << endl;
-        EC_WRITE_U16(domain1_pd + off_control_word, 0x0080);
-        ecrt_domain_queue(domain1);
-        ecrt_master_send(master);
-        usleep(10000);
-        return;
-    }
+    cmd = update_status(status, cmd);
+    EC_WRITE_U16(domain1_pd + off_control_word, cmd);
 
-    //  "Switch On Disabled"
-    if ((status & 0x006F) == 0x0040)
+    if (((status | 65424) ^ 65463) == 0)
     {
-        cerr << "Drive in 'Switch On Disabled' state, resetting fault..." << endl;
-        EC_WRITE_U16(domain1_pd + off_control_word, 0x0080); // Fault Reset
-        ecrt_domain_queue(domain1);
-        ecrt_master_send(master);
-        usleep(10000);
-        return;
+        EC_WRITE_S8(domain1_pd + off_operation_mode, 8); // 8 = Cyclic Synchronous Position mode , 1= profile position mode
+        EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
     }
-    while ((status & 0x006F) != 0x0027)
-    {
-        uint16_t control_word = 0x0000;
-    
-        if ((status & 0x006F) == 0x0021)
-            control_word |= (1 << 1) | (1 << 2); // Enable Voltage
-        else if ((status & 0x006F) == 0x0023)
-            control_word |= (1 << 1) | (1 << 0) | (1 << 2); // Switch On + Enable Voltage
-        else if ((status & 0x006F) == 0x0027)
-            control_word |= (1 << 1) | (1 << 0) | (1 << 3) | (1 << 2); // Enable Operation
-    
-        EC_WRITE_U16(domain1_pd + off_control_word, control_word);
-        ecrt_domain_queue(domain1);
-        ecrt_master_send(master);
-        usleep(10000);
-    
-        // Read updated status
-        status = EC_READ_U16(domain1_pd + off_status_word);
-    }
-    
-
-    EC_WRITE_S8(domain1_pd + off_operation_mode, 8); // 8 = Cyclic Synchronous Position mode , 1= profile position mode
-    EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
 
     if (status & (1 << 10))
     {
@@ -205,33 +203,6 @@ int main()
     }
     cout << "Slave configuration successful." << endl;
 
-    // Configure PDOs
-    ecrt_slave_config_sdo8(sc, 0x1C12, 0, 0); 
-    ecrt_slave_config_sdo8(sc, 0x1600, 0, 0);
-    /* Define RxPdo */
-
-    ecrt_slave_config_sdo32(sc, 0x1600, 1, 0x60400010); 
-    ecrt_slave_config_sdo32(sc, 0x1600, 2, 0x607a0020); 
-    ecrt_slave_config_sdo32(sc, 0x1600, 3, 0x60600008); 
-    ecrt_slave_config_sdo8(sc, 0x1600, 0, 3);          
-
-    ecrt_slave_config_sdo16(sc, 0x1C12, 1, 0x1600); 
-
-    ecrt_slave_config_sdo8(sc, 0x1C12, 0, 1); 
-
-    ecrt_slave_config_pdo_mapping_clear(sc, 0x1600);
-
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1600, 0x6040, 0, 16);
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1600, 0x607a, 0, 32); 
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1600, 0x6060, 0, 8);  /
-
-    /* Define TxPdo */
-
-    ecrt_slave_config_pdo_mapping_clear(sc, 0x1A00);
-
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1A00, 0x6041, 0, 16); 
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1A00, 0x6064, 0, 32); 
-    ecrt_slave_config_pdo_mapping_add(sc, 0x1A00, 0x606C, 0, 32); 
     if (ecrt_slave_config_pdos(sc, EC_END, slave_syncs))
     {
         cerr << "Failed to configure PDOs." << endl;
@@ -281,21 +252,10 @@ int main()
     cout << "what position you want to set in slave device" << endl;
 
     cin >> target_pos;
-
-    ec_slave_config_state_t slave_state;
-    ecrt_slave_config_state(sc, &slave_state);
-
-    if (slave_state.operational != EC_AL_STATE_OP)
-    {
-        cerr << "Error: Slave is not in OPERATIONAL state." << endl;
-
-        return 0;
-    }
     bool temp = false;
     while (!temp)
     {
-
-        cyclic_task(target_pos, temp);
+       cyclic_task(target_pos, temp);
     }
 
     if (master)
