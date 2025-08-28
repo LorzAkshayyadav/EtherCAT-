@@ -11,8 +11,8 @@
 
 using namespace std;
 
-#define VENDOR_ID 0x000022d2
-#define PRODUCT_CODE 0x00000301
+#define VENDOR_ID 0x0000029c
+#define PRODUCT_CODE 0x03831002
 
 // Define constants for the single slave
 #define SLAVE_POSITION 0
@@ -39,6 +39,7 @@ unsigned int off_target_position;
 unsigned int off_actual_position;
 unsigned int off_actual_velocity;
 unsigned int off_operation_mode;
+unsigned int off_operation_mode_disp;
 
 const ec_pdo_entry_reg_t domain1_pdo_entries[] = {
     {0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE, CONTROL_WORD_INDEX, 0x00, &off_control_word},
@@ -47,6 +48,7 @@ const ec_pdo_entry_reg_t domain1_pdo_entries[] = {
     {0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE, STATUS_WORD_INDEX, 0x00, &off_status_word},
     {0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE, ACTUAL_POSITION_INDEX, 0x00, &off_actual_position},
     {0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE, ACTUAL_VELOCITY_INDEX, 0x00, &off_actual_velocity},
+    {0, SLAVE_POSITION, VENDOR_ID, PRODUCT_CODE, 0x6061, 0x00, &off_operation_mode_disp},
 
     {}};
 
@@ -57,13 +59,14 @@ const ec_pdo_entry_info_t slave_pdo_entries[] = {
     {STATUS_WORD_INDEX, 0x00, 16},     // Status Word
     {ACTUAL_POSITION_INDEX, 0x00, 32}, // Actual Position
     {ACTUAL_VELOCITY_INDEX, 0x00, 32}, // Actual Velocity
+    {0x6061, 0x00, 8}, /* Operation mode display */
 
 };
 
 // PDO mapping
 const ec_pdo_info_t slave_pdos[] = {
     {0x1600, 3, slave_pdo_entries + 0}, // RxPDO
-    {0x1A00, 3, slave_pdo_entries + 3}, // TxPDO
+    {0x1A00, 4, slave_pdo_entries + 3}, // TxPDO
 };
 
 // Sync manager configuration
@@ -91,23 +94,30 @@ void check_domain1_state(void)
 
     domain1_state = ds;
 }
+int cmd = 0;
 uint16_t update_status(uint16_t status, uint16_t cmd) {
     // Fault handling
+    cout<<"we are applying CIA402"<<endl;
     if (status & (1 << 3)) {
+    cout<<"fault reset happening"<<endl;
         return 128;
     }
     
-    if ((status & 0x006F) && (status & (1 << 6))) {
-        return 128; //->it will do fault reset
-    }
+    //if ((status & 0x006F) && (status & (1 << 6))) {
+      // cout<<"Enabling voltage"<<endl;
+       // return 128; //->it will do fault reset
+   // }
 
     if (((status | 65456) ^ 65520) == 0 && cmd != 6) {
+        cout<<"taking it to ready to switch on"<<endl;
         cmd = 6; //->it will take drive to ready to switch on{110}
     } 
     else if (((status | 65424) ^ 65457) == 0 && cmd != 7) {
+    cout<<"switching on"<<endl;
         cmd = 7; //->it will switched on the drive {111}
     } 
     else if (((status | 65424) ^ 65459) == 0 && cmd != 15) {
+    cout<<"operation enabled"<<endl;
         cmd = 15;// ->it will enable the operation {1111}
     } 
     else if (((status | 65424) ^ 65463) == 0) {
@@ -116,7 +126,12 @@ uint16_t update_status(uint16_t status, uint16_t cmd) {
 
     return cmd;
 }
-void cyclic_task(int target_pos, bool &temp)
+
+
+bool first_loop = true;
+int pos=0;
+int step=0;
+void cyclic_task(int& target_pos, bool &temp)
 {
 
     // Process EtherCAT master and domain
@@ -125,31 +140,48 @@ void cyclic_task(int target_pos, bool &temp)
 
     // Check the domain state
     check_domain1_state();
-    int cmd = 0;
+    
     uint16_t status = EC_READ_U16(domain1_pd + off_status_word);
     int actual_pos = EC_READ_S32(domain1_pd + off_actual_position);
     int actual_vel = EC_READ_S32(domain1_pd + off_actual_velocity);
+    int op_mode = EC_READ_S8(domain1_pd + off_operation_mode_disp);
 
     cout << "Status: 0x" << hex << status
          << ", Position: " << dec << actual_pos
-         << ", Velocity: " << actual_vel << endl;
-
+         << ", Velocity: " << actual_vel 
+         << ", operation mode: "<<op_mode<<"\n";
+    
     cmd = update_status(status, cmd);
     EC_WRITE_U16(domain1_pd + off_control_word, cmd);
-
+    
     if (((status | 65424) ^ 65463) == 0)
     {
-        EC_WRITE_S8(domain1_pd + off_operation_mode, 8); // 8 = Cyclic Synchronous Position mode , 1= profile position mode
-        EC_WRITE_S32(domain1_pd + off_target_position, target_pos);
+    	
+    	if(first_loop)
+    	{
+    		pos = actual_pos;
+    		first_loop = false;
+    		if((target_pos-actual_pos)>0) step=100;
+    		else step=-100;
+    		
+    		cout<<"step"<<step<<endl;
+    	}
+    	else
+    	{
+    	              if((target_pos-actual_pos)<100  && (target_pos-actual_pos)>0)
+    	              {
+    	                  step=target_pos-actual_pos;
+    	              }
+
+    		       pos = pos + step ;
+    		       EC_WRITE_S8(domain1_pd + off_operation_mode, 8); // 8 = Cyclic Synchronous 		Position mode , 1= profile position mode
+	       EC_WRITE_S32(domain1_pd + off_target_position, pos);
+	       std::cout << "writing to target position: "<< pos<<"\n";
+    	}
+    	
     }
 
-    if (status & (1 << 10))
-    {
-        cout << "Target position reached!" << endl;
-        temp = true;
 
-        return;
-    }
 
     // Send EtherCAT process data
     ecrt_domain_queue(domain1);
@@ -159,7 +191,7 @@ void cyclic_task(int target_pos, bool &temp)
 }
 
 int main()
-{
+{   
     ec_slave_config_t *sc;
     // Request master
     master = ecrt_request_master(0);
